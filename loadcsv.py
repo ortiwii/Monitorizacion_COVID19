@@ -16,7 +16,7 @@ for act in data:
 try:
     conexion = mysql.connect(host='localhost',
                              user='root',
-                             password='Ikerbasauri0718',
+                             password='',
                              db='covid')
     try:
         with conexion.cursor() as cursor:
