@@ -1,9 +1,10 @@
+import urllib
 from datetime import date, timedelta
 from google.cloud import storage
 import pandas as pd
 from google.cloud import bigquery
 from datetime import datetime
-
+import os
 
 def upload_to_bucket(blob_name, path_to_file, bucket_name):
     """ Upload data to a bucket"""
@@ -34,39 +35,59 @@ def bigqueryExequte(rows_to_insert):
     client.close()
 if __name__ == "__main__":
 
-        # YYYY - MM - DD   HH: MM[:SS[.SSSSSS]]"}
-        yesterday = (date.today() - timedelta(days=4)).strftime('%m-%d-%Y')
-        day = datetime.today() - timedelta(days=4)
-        yesterdayOK = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
-        days_28 = (date.today() - timedelta(days=29)).strftime('%Y-%m-%d')
-        days_14 = (date.today() - timedelta(days=15)).strftime('%Y-%m-%d')
-        days_7 = (date.today() - timedelta(days=8)).strftime('%Y-%m-%d')
-        print(yesterdayOK)
-        print(days_28)
-        print(days_14)
-        print(days_7)
-        nombre = str(yesterday)+'.csv'
-        url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/'+nombre
-        df = pd.read_csv(url)
-        df.dropna(subset=["Lat"], inplace=True)
-        df = df.drop(columns=['FIPS', 'Admin2', 'Recovered', 'Active', 'Lat', 'Long_', 'Combined_Key'])
-        var = df['Incident_Rate'].iloc[0]
+    yesterday = (date.today() - timedelta(days=1)).strftime('%m-%d-%Y')
+    day = datetime.today() - timedelta(days=1)
+    yesterdayOK = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+    days_28 = (date.today() - timedelta(days=29)).strftime('%Y-%m-%d')
+    days_14 = (date.today() - timedelta(days=15)).strftime('%Y-%m-%d')
+    days_7 = (date.today() - timedelta(days=8)).strftime('%Y-%m-%d')
+    nombre = str(yesterday)+'.csv'
+    url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/'+nombre
+    df = pd.read_csv(url)
+
+    try:
+        df = df.rename({'Incidence_Rate': 'Incident_Rate', 'Case-Fatality_Ratio':'Case_Fatality_Ratio'}, axis=1)
+    except:
+        pass
+    try:
         df['Incident_Rate'] = df['Incident_Rate'].round(7)
+    except:
+        pass
+    try:
         df['Case_Fatality_Ratio'] = df['Case_Fatality_Ratio'].round(7)
-        df['Fecha'] = str(day)
-        df = df.where(pd.notnull(df), None)
-        rows_to_insert = df.to_dict('records')
-        df.to_csv(nombre, index = False)
-        print(day)
+    except:
+        pass
+    try:
+        df.dropna(subset=["Lat"], inplace=True)
+    except:
+        pass
+    try:
+        df = df.drop(columns=['Recovered', 'Lat', 'Long'])
+    except:
+        pass
+    try:
+        df = df.rename({'Province/State': 'Province_State', 'Country/Region': 'Country_Region',
+                        'Last Update': 'Last_Update'}, axis=1)
+    except:
+        pass
+
+    df['Fecha'] = str(day)
+    for act in df: print(act)
+    df = df.where(pd.notnull(df), None)
+    rows_to_insert = df.to_dict('records')
+    df.to_csv(nombre, index = False)
 
 
-        u = upload_to_bucket(nombre, nombre, "covidinfo-bucket")
 
-        jsonString = '{"arguments" : [{"name": "filename", "value": "gs://covidinfo-bucket/'+nombre+'"}, {"name": "day", "value": "'+str(yesterdayOK)+'"}, {"name": "day28", "value": "'+str(days_28)+'"}, {"name": "day14", "value": "'+str(days_14)+'"}, {"name": "day7", "value": "'+str(days_7)+'"}]}'
-        jsonFile = open("args.json", "w")
-        jsonFile.write(jsonString)
-        jsonFile.close()
 
-        u = upload_to_bucket("args.json", "args.json", "covidinfo-bucket")
+    u = upload_to_bucket('CSV/'+nombre, nombre, "covidinfo-bucket")
+    jsonString = '{"arguments" : [{"name": "filename", "value": "gs://covidinfo-bucket/'+nombre+'"}, {"name": "day", "value": "'+str(yesterdayOK)+'"}, {"name": "day28", "value": "'+str(days_28)+'"}, {"name": "day14", "value": "'+str(days_14)+'"}, {"name": "day7", "value": "'+str(days_7)+'"}]}'
+    jsonFile = open("args.json", "w")
+    jsonFile.write(jsonString)
+    jsonFile.close()
 
-        bigqueryExequte(rows_to_insert)
+    u = upload_to_bucket("args.json", "args.json", "covidinfo-bucket")
+
+    bigqueryExequte(rows_to_insert)
+
+    os.remove(nombre)
