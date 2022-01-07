@@ -30,33 +30,69 @@ def bigqueryExequte(rows_to_insert):
         print("Encountered errors while inserting rows: {}".format(errors))
     client.close()
 if __name__ == "__main__":
-
-    yesterday = (date.today() - timedelta(days=1)).strftime('%m-%d-%Y')
-    day = datetime.today() - timedelta(days=1)
+    i = 1
+    yesterday = (date.today() - timedelta(days=i)).strftime('%m-%d-%Y')
+    print(str(i)+': '+str(yesterday))
+    day = datetime.today() - timedelta(days=i)
     nombre = str(yesterday)+'.csv'
     url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/'+nombre
     df = pd.read_csv(url)
 
     try:
-
         df['Incident_Rate'] = df['Incident_Rate'].round(7)
+    except:
+        try:
+            df = df.rename(columns={'Incidence_Rate':'Incident_Rate'})
+        except:
+            pass
+    try:
         df['Case_Fatality_Ratio'] = df['Case_Fatality_Ratio'].round(7)
+    except:
+        try:
+            df = df.rename(columns={'Case-Fatality_Ratio': 'Case_Fatality_Ratio'})
+        except:
+            pass
+    try:
         df.dropna(subset=["Lat"], inplace=True)
-        df = df.drop(columns=['FIPS', 'Admin2', 'Recovered', 'Active', 'Lat', 'Long_', 'Combined_Key'])
+    except:
+        pass
+    try:
+        df = df.drop(columns=['Recovered'])
+        df = df.drop(columns=['Admin2', 'Active'])
+    except:
+        pass
+    try:
         df = df.where(pd.notnull(df), None)
     except:
         pass
+    try:
+        df = df.rename(columns={'Latitude': 'Lat'})
+    except:
+        pass
+    try:
+        df = df.rename(columns={'Longitude': 'Long_'})
+    except:
+        pass
+    try:
+        df = df.rename(columns={'Country/Region': 'Country_Region'})
+    except:
+        pass
+    try:
+        df = df.rename(columns={'Province/State': 'Province_State'})
+    except:
+        pass
+    try:
+        df = df.rename(columns={'Last Update': 'Last_Update'})
+    except:
+        pass
 
-
-    df['Fecha'] = str(day)
-
+    df['Fecha'] = day.strftime('%Y-%m-%d %H:%M:%S.%S')
+    df['Last_Update'] = day.strftime('%Y-%m-%d %H:%M:%S.%S')
     rows_to_insert = df.to_dict('records')
     df.to_csv(nombre, index = False)
-
-    for act in df: print(act)
-
 
     u = upload_to_bucket('CSV/'+nombre, nombre, "covidinfo-bucket")
 
     bigqueryExequte(rows_to_insert)
     os.remove(nombre)
+
